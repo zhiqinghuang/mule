@@ -4,6 +4,11 @@ MIGRATION GUIDE
 The following is a list of changes you have to execute to migrate from Mule Runtime Community edition version 3.4.x to version 3.7.x
 Please check https://developer.mulesoft.com/docs/display/current/Mule+ESB for more details.
 
+Migration changes from 3.9.1 to 3.9.x (including 3.9.1-SPX)
+MULE-8817: spring-messaging was upgraded from 4.1.9 to 4.3.17
+MULE-15004: The HTTP listener's socket server timeout default was changed from 0 to 60 seconds, while respecting the connectionIdleTimeout settings.
+MULE-15264: Message attachments now respect the order of their introduction, meaning their addition order will match the order in which they are sent to external services and the order in which they are received from external services will match the order in which they are stored.
+
 Migration changes from 3.9.0 to 3.9.x
 MULE-14381: By default, the File Connector processes empty files. For disabling this behavior use the mule.transport.file.ignoreEmptyFiles=true system property
 MULE-14507: The HTTP Requester now sends a zero content length in empty payloads scenarios. For disabling this behavior use the mule.http.client.avoidZeroContentLength=true system property.
