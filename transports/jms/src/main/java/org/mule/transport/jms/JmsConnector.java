@@ -47,6 +47,7 @@ import java.text.MessageFormat;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.jms.Connection;
@@ -205,7 +206,9 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
         ExceptionHelper.registerExceptionReader(new JmsExceptionReader());
     }
 
-    private boolean connectionFactoryIsSpringConfigured = false;
+    private AtomicBoolean isHandlingException = new AtomicBoolean(false);
+
+    private static Object factoryInterceptionLock = new Object();
 
     public JmsConnector(MuleContext context)
     {
@@ -288,11 +291,6 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
         return result;
     }
 
-    public boolean isConnectionFactorySpringConfigured()
-    {
-        return connectionFactoryIsSpringConfigured;
-    }
-
     protected ConnectionFactory createConnectionFactory() throws NamingException, MuleException
     {
         // if an initial factory class was configured that takes precedence over the 
@@ -326,7 +324,6 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
             // don't use JNDI. Use the spring-configured connection factory if that's provided
             if (connectionFactory != null)
             {
-                connectionFactoryIsSpringConfigured = true;
                 return connectionFactory;
             }
 
@@ -445,11 +442,21 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
         // If the connection factory was instanced directly as a Spring's CachingConnectionFactory,
         // disable the reconnectOnException property to avoid spring from handling exception without
         // passing through mule
-        else if (isConnectionFactorySpringConfigured() && connectionFactory instanceof CachingConnectionFactory)
+        else if (connectionFactory instanceof CachingConnectionFactory)
         {
             logger.info("Disabling 'reconnectOnException' option for bean-defined Spring's CachingConnectionFactory");
-            CachingConnectionFactory cachingConnectionFactory = (CachingConnectionFactory) connectionFactory;
-            cachingConnectionFactory.setReconnectOnException(false);
+
+            // Since connector initiate in an async manner, synchronization is needed.
+            synchronized (factoryInterceptionLock)
+            {
+                // Verifies that CachingConnectionFactory has been intercepted. If not, do intercept it.
+                interceptCachingConnectionFactory();
+            }
+
+            CachingConnectionFactoryExceptionInterceptor interceptorConnectionFactory =
+                    (CachingConnectionFactoryExceptionInterceptor) (((CachingConnectionFactory) connectionFactory).getTargetConnectionFactory());
+
+            interceptorConnectionFactory.registerConnector(this);
         }
 
         if ((connectionFactoryProperties != null) && !connectionFactoryProperties.isEmpty())
@@ -487,6 +494,26 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
             }
         }
         return connection;
+    }
+
+    private void interceptCachingConnectionFactory()
+    {
+        CachingConnectionFactory cachingConnectionFactory = (CachingConnectionFactory) connectionFactory;
+
+        // Verify that an CachingConnectionFactoryInterceptor has not been setup
+        if (!(cachingConnectionFactory.getTargetConnectionFactory() instanceof CachingConnectionFactoryExceptionInterceptor))
+        {
+            CachingConnectionFactoryExceptionInterceptor interceptorConnectionFactory = new
+                    CachingConnectionFactoryExceptionInterceptor(cachingConnectionFactory);
+
+            // Configure exception listeners.
+            cachingConnectionFactory.setReconnectOnException(false);
+            cachingConnectionFactory.setExceptionListener(interceptorConnectionFactory);
+
+            // Route connection factories.
+            interceptorConnectionFactory.setTargetConnectionFactory(cachingConnectionFactory.getTargetConnectionFactory());
+            cachingConnectionFactory.setTargetConnectionFactory(interceptorConnectionFactory);
+        }
     }
 
     @Override
@@ -527,11 +554,17 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
         }
     }
 
+    public void setExceptionIsBeingHandled(boolean aBoolean)
+    {
+        isHandlingException.set(aBoolean);
+    }
+
     @Override
     public void onException(JMSException jmsException)
     {
         if (!disconnecting)
         {
+
             Map<Object, MessageReceiver> receivers = getReceivers();
             boolean isMultiConsumerReceiver = false;
 
@@ -559,6 +592,8 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
                 receiverReportedExceptionCount.set(0);
                 muleContext.getExceptionListener().handleException(new ConnectException(jmsException, this));
             }
+
+            isHandlingException.set(false);
         }
     }
 
@@ -1504,5 +1539,10 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
     public void scheduleTimeoutTask(TimerTask timerTask, int timeout)
     {
         responseTimeoutTimer.schedule(timerTask, timeout);
+    }
+
+    public boolean isHandlingException()
+    {
+        return isHandlingException.get();
     }
 }
