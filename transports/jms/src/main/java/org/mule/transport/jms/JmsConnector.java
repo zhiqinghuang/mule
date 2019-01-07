@@ -84,6 +84,8 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
 
     public static final int REDELIVERY_IGNORE = -1;
 
+    private static final String JPMC_PATCH_LOGGING_PREFIX = "JPMC Patch >> ";
+
     private AtomicInteger receiverReportedExceptionCount = new AtomicInteger();
 
     ////////////////////////////////////////////////////////////////////////
@@ -428,8 +430,10 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
 
     protected Connection createConnection() throws MuleException, JMSException
     {
+        logger.error(JPMC_PATCH_LOGGING_PREFIX + "Creating a JMS Connection.");
         if (connectionFactory == null)
         {
+            logger.error(JPMC_PATCH_LOGGING_PREFIX + "No JMSConnectionFactory defined.");
             try
             {
                 connectionFactory = this.createConnectionFactory();
@@ -444,6 +448,7 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
         // passing through mule
         else if (connectionFactory instanceof CachingConnectionFactory)
         {
+            logger.error(JPMC_PATCH_LOGGING_PREFIX + "Connection factory is defined, and is Spring CachingConnectionFactory.");
 
             // Since connector initiate in an async manner, synchronization is needed.
             synchronized (factoryInterceptionLock)
@@ -497,12 +502,14 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
 
     private void interceptCachingConnectionFactory()
     {
+        logger.error(JPMC_PATCH_LOGGING_PREFIX + "Attempting ConnectionFactory interception");
+
         CachingConnectionFactory cachingConnectionFactory = (CachingConnectionFactory) connectionFactory;
 
         // Verify that an CachingConnectionFactoryInterceptor has not been setup
         if (!(cachingConnectionFactory.getTargetConnectionFactory() instanceof CachingConnectionFactoryExceptionInterceptor))
         {
-            logger.info("Intercepting CachingConnectionFactory for mule exception handling");
+            logger.error(JPMC_PATCH_LOGGING_PREFIX + "Intercepting CachingConnectionFactory for mule exception handling");
             CachingConnectionFactoryExceptionInterceptor interceptorConnectionFactory = new
                     CachingConnectionFactoryExceptionInterceptor(cachingConnectionFactory);
 
@@ -516,7 +523,7 @@ public class JmsConnector extends AbstractConnector implements ExceptionListener
         }
         else
         {
-            logger.info("CachingConnectionFactory already intercepted");
+            logger.error(JPMC_PATCH_LOGGING_PREFIX + "CachingConnectionFactory already intercepted");
         }
     }
 
