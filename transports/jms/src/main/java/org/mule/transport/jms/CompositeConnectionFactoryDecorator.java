@@ -22,6 +22,7 @@ public class CompositeConnectionFactoryDecorator implements ConnectionFactoryDec
     {
         decorators.add(new DefaultConnectionFactoryDecorator());
         decorators.add(new CachingConnectionFactoryDecorator());
+        decorators.add(new ReconnectInterceptorCachingConnectionFactoryDecorator());
     }
 
     @Override
