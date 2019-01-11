@@ -12,6 +12,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
@@ -24,11 +25,12 @@ import org.springframework.jms.connection.CachingConnectionFactory;
 public class ReconnectInterceptorCachingConnectionFactory extends CachingConnectionFactory
 {
 
-    private boolean isReconnecting;
+    private AtomicBoolean isReconnecting = new AtomicBoolean();
 
     public ReconnectInterceptorCachingConnectionFactory(ConnectionFactory targetConnectionFactory)
     {
         super(targetConnectionFactory);
+        isReconnecting.set(false);
     }
 
     @Override
@@ -52,14 +54,14 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
     @Override
     public void resetConnection()
     {
-        isReconnecting = true;
+        isReconnecting.set(true);
         try
         {
             super.resetConnection();
         }
         finally
         {
-            isReconnecting = false;
+            isReconnecting.set(false);
         }
     }
 
@@ -68,7 +70,7 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
         {
-            if (method.getName().equals("getConnection") && isReconnecting)
+            if (method.getName().equals("getConnection") && isReconnecting.get())
             {
                 throw new JMSException("Cannot get connection while reconnecting.");
             }
