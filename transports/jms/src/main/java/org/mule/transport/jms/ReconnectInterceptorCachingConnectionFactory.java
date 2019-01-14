@@ -36,7 +36,11 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
     @Override
     public Connection createConnection() throws JMSException
     {
-        Connection target = super.createConnection();
+        return getConnectionProxy(getConnection());
+    }
+
+    private Connection getConnectionProxy(Connection target)
+    {
         List<Class<?>> classes = new ArrayList<Class<?>>(3);
         classes.add(Connection.class);
         if (target instanceof QueueConnection) {
