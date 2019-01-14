@@ -48,6 +48,7 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
     @Override
     public Connection createConnection() throws JMSException
     {
+        isReconnecting.set(false);
         return getConnectionProxy(super.createConnection());
     }
 
@@ -71,14 +72,7 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
     public void resetConnection()
     {
         isReconnecting.set(true);
-        try
-        {
-            super.resetConnection();
-        }
-        finally
-        {
-            isReconnecting.set(false);
-        }
+        super.resetConnection();
     }
 
     class SharedConnectionInvocationHandler implements InvocationHandler
@@ -94,7 +88,8 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
         {
-            if (method.getName().equals("getConnection") && isReconnecting.get())
+            if ((method.getName().equals("getConnection") || method.getName().equals("toString") || method.getName().equals("createSession"))
+                && isReconnecting.get())
             {
                 throw new JMSException("Cannot get connection while reconnecting.");
             }
