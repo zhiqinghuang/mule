@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+      xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:spring="http://www.springframework.org/schema/beans"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+        http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+
+    <spring:beans>
+        <spring:bean id="cachingConnectionFactory" class="org.springframework.jms.connection.CachingConnectionFactory">
+            <spring:property name="targetConnectionFactory" ref="activeMqConnectionFactory" />
+            <spring:property name="sessionCacheSize" value="10" />
+            <spring:property name="cacheConsumers" value="false" />
+            <spring:property name="cacheProducers" value="false" />
+        </spring:bean>
+
+        <spring:bean id="activeMqConnectionFactory" class="org.apache.activemq.ActiveMQConnectionFactory">
+            <spring:property name="brokerURL" value="tcp://localhost:${port}" />
+        </spring:bean>
+    </spring:beans>
+
+    <jms:connector name="activemqconnector" connectionFactory-ref="cachingConnectionFactory" numberOfConsumers="1">
+        <reconnect-forever frequency="1000" blocking="false"/>
+    </jms:connector>
+
+
+    <flow name="put">
+        <jms:outbound-endpoint queue="in" connector-ref="activemqconnector"/>
+    </flow>
+
+    <flow name="get">
+        <jms:inbound-endpoint queue="in" connector-ref="activemqconnector"/>
+        <vm:outbound-endpoint path="output" exchange-pattern="one-way" />
+    </flow>
+
+
+</mule>

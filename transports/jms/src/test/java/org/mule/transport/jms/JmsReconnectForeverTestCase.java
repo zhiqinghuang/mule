@@ -26,12 +26,12 @@ import org.junit.Test;
 public class JmsReconnectForeverTestCase extends AbstractBrokerFunctionalTestCase
 {
 
-    private static final int CONSUMER_COUNT = 1;
-    private static final int POLL_DELAY_MILLIS = 100;
-    private static final int POLL_TIMEOUT_MILLIS = 5000;
+    protected static final int CONSUMER_COUNT = 1;
+    protected static final int POLL_DELAY_MILLIS = 100;
+    protected static final int POLL_TIMEOUT_MILLIS = 5000;
 
-    private JmsConnector connector;
-    private Connection connection;
+    protected JmsConnector connector;
+    protected Connection connection;
 
     @Override
     protected String getConfigFile()
@@ -63,6 +63,34 @@ public class JmsReconnectForeverTestCase extends AbstractBrokerFunctionalTestCas
 
         Collection<MessageReceiver> receivers = connector.getReceivers().values();
         assertTrue(receivers != null && receivers.size() == 2);
+        assertJmsConnectorIsConnected();
+        this.assertMessageRouted("put1");
+        this.assertMessageRouted("put2");
+    }
+
+    protected void assertConsumersConnected()
+    {
+        for (MessageReceiver messageReceiver : connector.getReceivers().values())
+        {
+            MultiConsumerJmsMessageReceiver receiver = (MultiConsumerJmsMessageReceiver) messageReceiver;
+            for (MultiConsumerJmsMessageReceiver.SubReceiver consumer : receiver.consumers)
+            {
+                assertThat(consumer.connected, is(true));
+            }
+        }
+
+    }
+
+    protected void assertMessageRouted(String entryFlow) throws Exception
+    {
+        this.runFlow(entryFlow, TEST_MESSAGE);
+        MuleMessage message = muleContext.getClient().request("vm://out" + entryFlow, RECEIVE_TIMEOUT);
+        assertThat(message, notNullValue());
+        assertThat(message.getPayloadAsString(), is(TEST_MESSAGE));
+    }
+
+    protected void assertJmsConnectorIsConnected() throws Exception
+    {
         Prober prober = new PollingProber(POLL_TIMEOUT_MILLIS, POLL_DELAY_MILLIS);
         prober.check(new Probe()
         {
@@ -85,29 +113,6 @@ public class JmsReconnectForeverTestCase extends AbstractBrokerFunctionalTestCas
             }
         });
         this.assertConsumersConnected();
-        this.assertMessageRouted("put1");
-        this.assertMessageRouted("put2");
-    }
-
-    private void assertConsumersConnected()
-    {
-        for (MessageReceiver messageReceiver : connector.getReceivers().values())
-        {
-            MultiConsumerJmsMessageReceiver receiver = (MultiConsumerJmsMessageReceiver) messageReceiver;
-            for (MultiConsumerJmsMessageReceiver.SubReceiver consumer : receiver.consumers)
-            {
-                assertThat(consumer.connected, is(true));
-            }
-        }
-
-    }
-
-    private void assertMessageRouted(String entryFlow) throws Exception
-    {
-        this.runFlow(entryFlow, TEST_MESSAGE);
-        MuleMessage message = muleContext.getClient().request("vm://out" + entryFlow, RECEIVE_TIMEOUT);
-        assertThat(message, notNullValue());
-        assertThat(message.getPayloadAsString(), is(TEST_MESSAGE));
     }
 }
 
