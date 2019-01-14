@@ -10,18 +10,22 @@ import org.mule.api.MuleContext;
 
 import javax.jms.ConnectionFactory;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.jms.connection.CachingConnectionFactory;
 
 public class ReconnectInterceptorCachingConnectionFactoryDecorator implements ConnectionFactoryDecorator
 {
+
+    private final Log logger = LogFactory.getLog(getClass());
 
     private ReconnectInterceptorCachingConnectionFactory reconnectInterceptorCachingConnectionFactory;
 
     @Override
     public ConnectionFactory decorate(ConnectionFactory connectionFactory, JmsConnector jmsConnector, MuleContext mulecontext)
     {
+        logger.info("Decorating JMS connection factory with " + getClass().getName());
         reconnectInterceptorCachingConnectionFactory = new ReconnectInterceptorCachingConnectionFactory(connectionFactory);
-
         return reconnectInterceptorCachingConnectionFactory;
     }
 
