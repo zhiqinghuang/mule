@@ -25,12 +25,24 @@ import org.springframework.jms.connection.CachingConnectionFactory;
 public class ReconnectInterceptorCachingConnectionFactory extends CachingConnectionFactory
 {
 
+    private final ConnectionFactory realTargetConnectionFactory;
     private AtomicBoolean isReconnecting = new AtomicBoolean();
 
     public ReconnectInterceptorCachingConnectionFactory(ConnectionFactory targetConnectionFactory)
     {
         super(targetConnectionFactory);
+
+        // Since the decorate applyTo methods verifies that the targetConnectionFactory is a CachingConnectionFactory, this
+        // methods does not need to be in a try-catch idiom.
+        realTargetConnectionFactory = ((CachingConnectionFactory) targetConnectionFactory).getTargetConnectionFactory();
+
         isReconnecting.set(false);
+    }
+
+    @Override
+    public ConnectionFactory getTargetConnectionFactory()
+    {
+        return realTargetConnectionFactory;
     }
 
     @Override
