@@ -48,7 +48,7 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
     @Override
     public Connection createConnection() throws JMSException
     {
-        return getConnectionProxy(getConnection());
+        return getConnectionProxy(super.createConnection());
     }
 
     private Connection getConnectionProxy(Connection target)
@@ -64,7 +64,7 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
         return (Connection) Proxy.newProxyInstance(
                 Connection.class.getClassLoader(),
                 classes.toArray(new Class<?>[classes.size()]),
-                new SharedConnectionInvocationHandler());
+                new SharedConnectionInvocationHandler(target));
     }
 
     @Override
@@ -83,6 +83,14 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
 
     class SharedConnectionInvocationHandler implements InvocationHandler
     {
+
+        private Connection proxiedConnection;
+
+        public SharedConnectionInvocationHandler(Connection target)
+        {
+            proxiedConnection = target;
+        }
+
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable
         {
@@ -92,7 +100,7 @@ public class ReconnectInterceptorCachingConnectionFactory extends CachingConnect
             }
 
             try {
-                return method.invoke(getConnection(), args);
+                return method.invoke(proxiedConnection, args);
             }
             catch (InvocationTargetException ex) {
                 throw ex.getTargetException();
