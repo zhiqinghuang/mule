@@ -45,7 +45,6 @@ public class JmsReconnectForeverWithCachingConnFactoryTestCase extends JmsReconn
         connectionListener.setExpectedAction(ConnectionNotification.CONNECTION_CONNECTED)
                 .setNumberOfExecutionsRequired(1)
                 .waitUntilNotificationsAreReceived();
-        connectionListener.waitUntilNotificationsAreReceived();
 
         assertJmsConnectorIsConnected();
         this.assertMessageRouted("put");
