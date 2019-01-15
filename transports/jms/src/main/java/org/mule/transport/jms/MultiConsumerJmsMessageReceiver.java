@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import javax.jms.Destination;
+import javax.jms.IllegalStateException;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageConsumer;
@@ -208,6 +209,12 @@ public class MultiConsumerJmsMessageReceiver extends AbstractMessageReceiver
         for (Iterator<SubReceiver> it = consumers.iterator(); it.hasNext();)
         {
             sub = it.next();
+            // If I've already attempted to stop a subreceiver, it means I've tried to stop them all.
+            if (sub.hasAlreadyAttemptedStop())
+            {
+                logger.warn("Already attempted to stop subreceivers. Avoiding second attempt.");
+                break;
+            }
             try
             {
                 sub.doDisconnect();
@@ -252,6 +259,13 @@ public class MultiConsumerJmsMessageReceiver extends AbstractMessageReceiver
         protected volatile boolean connected;
         protected volatile boolean started;
         protected volatile boolean isProcessingMessage;
+
+        public boolean hasAlreadyAttemptedStop()
+        {
+            return alreadyAttemptedStop;
+        }
+
+        protected volatile boolean alreadyAttemptedStop = false;
 
         protected void doConnect() throws MuleException
         {
@@ -334,25 +348,38 @@ public class MultiConsumerJmsMessageReceiver extends AbstractMessageReceiver
         protected void doStop(boolean force) throws MuleException
         {
             subLogger.debug("SUB doStop()");
-
-            if (consumer != null)
+            if (force)
+            {
+                logger.warn("JMS Sub-receiver being forcefully closed");
+                started = false;
+            }
+            if (consumer != null && !alreadyAttemptedStop)
             {
                 try
                 {
+                    consumer.getMessageListener();
                     consumer.setMessageListener(null);
                     started = false;
                 }
+                catch (IllegalStateException e)
+                {
+                    logger.error("Consumer's connection was closed when method was called.");
+                    throw new LifecycleException(e, this);
+                }
                 catch (JMSException e)
                 {
-                    if (force)
-                    {
-                        logger.warn("Unable to cleanly stop subreceiver", e);
-                        started = false;
-                    }
-                    else
+                    if (!force)
                     {
                         throw new LifecycleException(e, this);
                     }
+                    else
+                    {
+                        logger.warn("Unable to cleanly stop subreceiver", e);
+                    }
+                }
+                finally
+                {
+                    alreadyAttemptedStop = true;
                 }
             }
         }
