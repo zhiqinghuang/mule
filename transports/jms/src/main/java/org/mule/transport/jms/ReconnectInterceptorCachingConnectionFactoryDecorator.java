@@ -24,7 +24,7 @@ public class ReconnectInterceptorCachingConnectionFactoryDecorator implements Co
     @Override
     public ConnectionFactory decorate(ConnectionFactory connectionFactory, JmsConnector jmsConnector, MuleContext mulecontext)
     {
-        logger.info("Decorating JMS connection factory with " + getClass().getName());
+        logger.error("Decorating JMS connection factory with " + getClass().getName());
         reconnectInterceptorCachingConnectionFactory = new ReconnectInterceptorCachingConnectionFactory(connectionFactory);
         return reconnectInterceptorCachingConnectionFactory;
     }

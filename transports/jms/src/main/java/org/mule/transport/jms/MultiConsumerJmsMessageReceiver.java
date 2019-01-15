@@ -212,7 +212,7 @@ public class MultiConsumerJmsMessageReceiver extends AbstractMessageReceiver
             // If I've already attempted to stop a subreceiver, it means I've tried to stop them all.
             if (sub.hasAlreadyAttemptedStop())
             {
-                logger.warn("Already attempted to stop subreceivers. Avoiding second attempt.");
+                logger.error("Already attempted to stop subreceivers. Avoiding second attempt.");
                 break;
             }
             try
@@ -374,7 +374,7 @@ public class MultiConsumerJmsMessageReceiver extends AbstractMessageReceiver
                     }
                     else
                     {
-                        logger.warn("Unable to cleanly stop subreceiver", e);
+                        logger.error("Unable to cleanly stop subreceiver", e);
                     }
                 }
                 finally
