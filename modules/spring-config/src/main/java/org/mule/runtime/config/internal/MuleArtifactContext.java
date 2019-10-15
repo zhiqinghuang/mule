@@ -12,7 +12,6 @@ import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparing;
 import static java.util.Optional.empty;
 import static java.util.Optional.of;
-import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.mule.runtime.api.component.AbstractComponent.ROOT_CONTAINER_NAME_KEY;
@@ -55,7 +54,6 @@ import org.mule.runtime.config.api.dsl.model.ComponentBuildingDefinitionRegistry
 import org.mule.runtime.config.api.dsl.model.ResourceProvider;
 import org.mule.runtime.config.api.dsl.processor.ArtifactConfig;
 import org.mule.runtime.config.internal.dsl.model.ClassLoaderResourceProvider;
-import org.mule.runtime.config.internal.dsl.model.ConfigurationDependencyResolver;
 import org.mule.runtime.config.internal.dsl.model.SpringComponentModel;
 import org.mule.runtime.config.internal.dsl.model.config.DefaultConfigurationPropertiesResolver;
 import org.mule.runtime.config.internal.dsl.model.config.EnvironmentPropertiesConfigurationProvider;
@@ -147,9 +145,8 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
   private final XmlConfigurationDocumentLoader xmlConfigurationDocumentLoader;
   private final Optional<ConfigurationProperties> parentConfigurationProperties;
   private final DefaultRegistry serviceDiscoverer;
-  private final ConfigurationDependencyResolver configurationDependencyResolver;
   private final DefaultResourceLocator resourceLocator;
-  protected ApplicationModel applicationModel;
+  protected final ApplicationModel applicationModel;
   private final MuleContextWithRegistry muleContext;
   private final ConfigResource[] artifactConfigResources;
   protected BeanDefinitionFactory beanDefinitionFactory;
@@ -165,6 +162,7 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
   });
   protected List<ConfigurableObjectProvider> objectProviders = new ArrayList<>();
   private org.mule.runtime.core.internal.registry.Registry originalRegistry;
+  private final ExtensionManager extensionManager;
 
   /**
    * Parses configuration files creating a spring ApplicationContext which is used as a parent registry using the SpringRegistry
@@ -218,9 +216,9 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
     runtimeComponentBuildingDefinitionProvider.getComponentBuildingDefinitions()
         .forEach(componentBuildingDefinitionRegistry::register);
 
-    getExtensionModelsComponentBuildingDefinitions(serviceRegistry,
-                                                   getExtensionModels(muleContext.getExtensionManager()).orElse(emptySet()))
-                                                       .forEach(componentBuildingDefinitionRegistry::register);
+    extensionManager = muleContext.getExtensionManager();
+    getExtensionModelsComponentBuildingDefinitions(serviceRegistry, getExtensions())
+        .forEach(componentBuildingDefinitionRegistry::register);
 
     for (ClassLoader pluginArtifactClassLoader : pluginsClassLoaders) {
       getArtifactComponentBuildingDefinitions(serviceRegistry, pluginArtifactClassLoader)
@@ -230,19 +228,11 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
     this.beanDefinitionFactory =
         new BeanDefinitionFactory(componentBuildingDefinitionRegistry, muleContext.getErrorTypeRepository());
 
-    createApplicationModel();
-
-    this.configurationDependencyResolver =
-        new ConfigurationDependencyResolver(applicationModel, componentBuildingDefinitionRegistry);
+    this.applicationModel = createApplicationModel();
   }
 
   protected MuleRegistry getMuleRegistry() {
     return this.muleContext.getRegistry();
-  }
-
-  private static Optional<Set<ExtensionModel>> getExtensionModels(ExtensionManager extensionManager) {
-    return ofNullable(extensionManager == null ? null
-        : extensionManager.getExtensions());
   }
 
   private void validateAllConfigElementHaveParsers() {
@@ -254,7 +244,7 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
     });
   }
 
-  private void createApplicationModel() {
+  private ApplicationModel createApplicationModel() {
     try {
       DefaultConfigurationPropertiesResolver propertyResolver =
           new DefaultConfigurationPropertiesResolver(empty(), new EnvironmentPropertiesConfigurationProvider());
@@ -301,13 +291,11 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
           .setApplicationName(getArtifactName())
           .addConfigFiles(configFiles).build();
 
-      Set<ExtensionModel> extensions =
-          muleContext.getExtensionManager() != null ? muleContext.getExtensionManager().getExtensions() : emptySet();
       ResourceProvider externalResourceProvider = new ClassLoaderResourceProvider(muleContext.getExecutionClassLoader());
-      applicationModel = new ApplicationModel(artifactConfig, artifactDeclaration, extensions,
-                                              artifactProperties, parentConfigurationProperties,
-                                              of(componentBuildingDefinitionRegistry),
-                                              externalResourceProvider);
+      return new ApplicationModel(artifactConfig, artifactDeclaration, getExtensions(),
+                                  artifactProperties, parentConfigurationProperties,
+                                  of(componentBuildingDefinitionRegistry),
+                                  externalResourceProvider);
     } catch (MuleRuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -316,9 +304,7 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
   }
 
   public void initialize() {
-    Set<ExtensionModel> extensions =
-        muleContext.getExtensionManager() != null ? muleContext.getExtensionManager().getExtensions() : emptySet();
-    applicationModel.macroExpandXmlSdkComponents(extensions);
+    applicationModel.macroExpandXmlSdkComponents(getExtensions());
 
     validateAllConfigElementHaveParsers();
   }
@@ -532,13 +518,6 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
     return createdComponentModels;
   }
 
-  /**
-   * @return a resolver for dependencies between configuration objects
-   */
-  public ConfigurationDependencyResolver getDependencyResolver() {
-    return configurationDependencyResolver;
-  }
-
   @Override
   protected void customizeBeanFactory(DefaultListableBeanFactory beanFactory) {
     super.customizeBeanFactory(beanFactory);
@@ -726,7 +705,7 @@ public class MuleArtifactContext extends AbstractRefreshableConfigApplicationCon
 
   @Override
   public Set<ExtensionModel> getExtensions() {
-    return muleContext.getExtensionManager() == null ? emptySet() : muleContext.getExtensionManager().getExtensions();
+    return extensionManager == null ? emptySet() : extensionManager.getExtensions();
   }
 
   @Override
