@@ -92,7 +92,6 @@ public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctional
     }
 
     super.doTearDown();
-    reset();
   }
 
   private void reset() {
