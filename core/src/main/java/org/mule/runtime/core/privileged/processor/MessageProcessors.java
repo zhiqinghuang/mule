@@ -37,7 +37,6 @@ import org.mule.runtime.core.api.processor.Processor;
 import org.mule.runtime.core.api.processor.ReactiveProcessor;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategy;
 import org.mule.runtime.core.api.processor.strategy.ProcessingStrategyFactory;
-import org.mule.runtime.core.internal.construct.FlowBackPressureException;
 import org.mule.runtime.core.internal.exception.MessagingException;
 import org.mule.runtime.core.internal.processor.strategy.TransactionAwareStreamEmitterProcessingStrategyFactory;
 import org.mule.runtime.core.internal.rx.FluxSinkRecorder;
@@ -55,6 +54,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -64,6 +65,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 /**
  * Some convenience methods for message processors.
@@ -71,6 +73,7 @@ import reactor.core.publisher.Mono;
 public class MessageProcessors {
 
   private static final String WITHIN_PROCESS_WITH_CHILD_CONTEXT = "messageProcessors.withinProcessWithChildContext";
+  private static final String KEY_ON_NEXT_ERROR_STRATEGY = "reactor.onNextError.localStrategy";
   private static final Logger LOGGER = LoggerFactory.getLogger(MessageProcessors.class);
 
   private MessageProcessors() {
@@ -454,6 +457,7 @@ public class MessageProcessors {
   private static Publisher<CoreEvent> internalApplyWithChildContext(Publisher<CoreEvent> eventChildCtxPub,
                                                                     ReactiveProcessor processor,
                                                                     boolean completeParentIfEmpty) {
+    AtomicReference<Optional<BiConsumer>> onErrorContinueProperty = new AtomicReference<>();
     return Flux.from(eventChildCtxPub)
         .compose(eventPub -> subscriberContext()
             .flatMapMany(ctx -> {
@@ -474,17 +478,30 @@ public class MessageProcessors {
                                                   completeParentIfEmpty);
                     })
                     .transform(processor)
+                    // Here we apply the same onErrorContinue strategy saved before
+                    .compose(pub -> pub.subscriberContext(actualContext -> {
+                      Context newContext = ctx.put(KEY_ON_NEXT_ERROR_STRATEGY, onErrorContinueProperty.get().get());
+                      return newContext;
+                    }))
                     .doOnNext(completeSuccessIfNeeded())
                     .map(event -> right(MessagingException.class, event))
 
                     // This Either here is used to propagate errors. If the error is sent directly through the merged with Flux,
-                    // it will be cancelled, ignoring the onErrorcontinue of the parent Flux.
+                    // it will be cancelled, ignoring the onErrorContinue of the parent Flux.
                     .doOnComplete(() -> errorSwitchSinkSinkRef.complete())
                     .mergeWith(create(errorSwitchSinkSinkRef))
 
                     .map(childContextResponseMapper())
                     .distinct(event -> (BaseEventContext) event.getContext(), () -> seenContexts)
-                    .map(MessageProcessors::toParentContext);
+                    .map(MessageProcessors::toParentContext)
+                    // This is the onErrorContinue strategy to be used in all child contexts, to avoid propagate the parent's strategy
+                    .onErrorContinue((e, o) -> {
+                    })
+                    // Here we save the onErrorContinue strategy on subscription time to be replaced and used later
+                    .compose(pub -> pub.subscriberContext(context -> {
+                      onErrorContinueProperty.set(context.getOrEmpty(KEY_ON_NEXT_ERROR_STRATEGY));
+                      return context;
+                    }));
               }
             }));
   }
