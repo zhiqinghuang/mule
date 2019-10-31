@@ -92,7 +92,6 @@ public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctional
     }
 
     super.doTearDown();
-    reset();
   }
 
   private void reset() {
@@ -108,7 +107,6 @@ public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctional
     HeisenbergSource.location = null;
   }
 
-  @FlakyTest(times = 1000)
   @Test
   public void source() throws Exception {
     startFlow("source");
@@ -179,7 +177,6 @@ public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctional
     probe(TIMEOUT_MILLIS, POLL_DELAY_MILLIS, () -> sourceTimesStarted > 2);
   }
 
-  @FlakyTest(times = 1000)
   @Test
   public void sourceOnSuccessCallsOnTerminate() throws Exception {
     startFlow("source");
@@ -191,7 +188,6 @@ public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctional
     assertThat(HeisenbergSource.error, empty());
   }
 
-  @FlakyTest(times = 1000)
   @Test
   public void sourceFailsOnSuccessParametersCallsOnErrorAndOnTerminate() throws Exception {
     startFlow("sourceWithInvalidSuccessParameter");
@@ -260,7 +256,6 @@ public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctional
     probe(TIMEOUT_MILLIS, POLL_DELAY_MILLIS, () -> assertState(false, true, true));
   }
 
-  @FlakyTest(times = 1000)
   @Test
   public void failureInFlowErrorHandlerCallsOnErrorDirectlyAndHandlesItCorrectly() throws Exception {
     startFlow("failureInFlowErrorHandlerCallsOnErrorDirectly");

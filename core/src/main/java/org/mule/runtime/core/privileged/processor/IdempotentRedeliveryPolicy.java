@@ -250,6 +250,9 @@ public class IdempotentRedeliveryPolicy extends AbstractRedeliveryPolicy {
   }
 
   public RedeliveryCounter findCounter(String messageId) throws ObjectStoreException {
+    if (store == null) {
+      return null;
+    }
     boolean counterExists = store.contains(messageId);
     if (counterExists) {
       return store.retrieve(messageId);
