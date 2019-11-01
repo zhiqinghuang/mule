@@ -93,9 +93,9 @@ public class HeisenbergSource extends Source<String, Object> {
   public static TerminateStatus terminateStatus;
   public static java.util.Optional<Error> error;
 
-  public static boolean executedOnSuccess;
-  public static boolean executedOnError;
-  public static boolean executedOnTerminate;
+  public static volatile boolean executedOnSuccess;
+  public static volatile boolean executedOnError;
+  public static volatile boolean executedOnTerminate;
   public static long gatheredMoney;
 
   public static String configName;
