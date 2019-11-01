@@ -90,7 +90,7 @@ public class HeisenbergSource extends Source<String, Object> {
   public static boolean receivedInlineOnSuccess;
   public static boolean receivedInlineOnError;
 
-  public static TerminateStatus terminateStatus;
+  public static volatile TerminateStatus terminateStatus;
   public static java.util.Optional<Error> error;
 
   public static volatile boolean executedOnSuccess;
