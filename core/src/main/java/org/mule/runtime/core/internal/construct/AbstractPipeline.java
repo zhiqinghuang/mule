@@ -235,7 +235,8 @@ public abstract class AbstractPipeline extends AbstractFlowConstruct implements 
   private ReactiveProcessor dispatchToFlow() {
     return publisher -> from(publisher)
         .doOnNext(assertStarted())
-        .flatMap(routeThroughProcessingStrategy()).onErrorContinue((t, o) -> {});
+        .flatMap(routeThroughProcessingStrategy()).onErrorContinue((t, o) -> {
+        });
   }
 
   protected Function<CoreEvent, Publisher<? extends CoreEvent>> routeThroughProcessingStrategy() {
