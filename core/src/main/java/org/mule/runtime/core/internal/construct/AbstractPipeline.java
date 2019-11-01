@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -228,6 +229,8 @@ public abstract class AbstractPipeline extends AbstractFlowConstruct implements 
     initialiseIfNeeded(pipeline, muleContext);
   }
 
+  private static final String KEY_ON_NEXT_ERROR_STRATEGY = "reactor.onNextError.localStrategy";
+
   /*
    * Processor that dispatches incoming source Events to the internal pipeline the Sink. The way in which the Event is dispatched
    * and how overload is handled depends on the Source back-pressure strategy.
@@ -235,8 +238,15 @@ public abstract class AbstractPipeline extends AbstractFlowConstruct implements 
   private ReactiveProcessor dispatchToFlow() {
     return publisher -> from(publisher)
         .doOnNext(assertStarted())
-        .flatMap(routeThroughProcessingStrategy()).onErrorContinue((t, o) -> {
-        });
+        .flatMap(routeThroughProcessingStrategy()).compose(pub -> pub.subscriberContext(context -> {
+          Optional<Object> onErrorStrategy = context.getOrEmpty(KEY_ON_NEXT_ERROR_STRATEGY);
+          if (onErrorStrategy.isPresent()) {
+            BiConsumer<Throwable, Object> onErrorContinue = (e, o) -> {
+            };
+            return context.put(KEY_ON_NEXT_ERROR_STRATEGY, onErrorContinue);
+          }
+          return context;
+        }));
   }
 
   protected Function<CoreEvent, Publisher<? extends CoreEvent>> routeThroughProcessingStrategy() {
