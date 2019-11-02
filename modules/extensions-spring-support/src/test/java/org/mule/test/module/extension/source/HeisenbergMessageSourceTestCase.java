@@ -59,7 +59,7 @@ import java.util.Optional;
 public class HeisenbergMessageSourceTestCase extends AbstractExtensionFunctionalTestCase {
 
   public static final int TIMEOUT_MILLIS = 50000;
-  public static final int POLL_DELAY_MILLIS = 100;
+  public static final int POLL_DELAY_MILLIS = 10000;
   public static final int TIME_WAIT_MILLIS = 3000;
 
   private static final String OUT = "out";

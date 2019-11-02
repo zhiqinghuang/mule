@@ -67,6 +67,8 @@ import org.mule.runtime.extension.api.runtime.source.SourceResult;
 import org.mule.test.heisenberg.extension.model.Methylamine;
 import org.mule.test.heisenberg.extension.model.PersonalInfo;
 import org.mule.test.heisenberg.extension.model.Weapon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
@@ -182,14 +184,13 @@ public class HeisenbergSource extends Source<String, Object> {
                         @ParameterGroup(name = "Success Info", showInDsl = true) PersonalInfo successInfo,
                         @Optional boolean fail,
                         NotificationEmitter notificationEmitter) {
-
     gatheredMoney += payment;
     receivedGroupOnSource = ricin != null && ricin.getNextDoor().getAddress() != null;
     receivedInlineOnSuccess = successInfo != null && successInfo.getAge() != null && successInfo.getKnownAddresses() != null;
     executedOnSuccess = true;
 
     notificationEmitter.fireLazy(BATCH_DELIVERED, () -> payment, fromType(Long.class));
-
+    LoggerFactory.getLogger(HeisenbergSource.configName).debug("ON SUCCESS EXECUTED!");
     if (fail) {
       throw new RuntimeException("Some internal exception");
     }
@@ -206,6 +207,7 @@ public class HeisenbergSource extends Source<String, Object> {
     receivedInlineOnError = infoError != null && infoError.getName() != null && !infoError.getName().equals(HEISENBERG);
     executedOnError = true;
     notificationEmitter.fireLazy(BATCH_DELIVERY_FAILED, () -> infoError, DataType.fromType(PersonalInfo.class));
+    LoggerFactory.getLogger(HeisenbergSource.configName).debug("ON ERROR EXECUTED!");
     if (propagateError) {
       throw new RuntimeException("Some internal exception");
     }
@@ -227,6 +229,7 @@ public class HeisenbergSource extends Source<String, Object> {
         error = of(bodyError);
       });
     }
+    LoggerFactory.getLogger(HeisenbergSource.configName).debug("ON TERMINATE EXECUTED!");
     executedOnTerminate = true;
     notificationEmitter.fireLazy(BATCH_TERMINATED, () -> sourceResult.getSourceCallbackContext().getVariable(BATCH_NUMBER).get(),
                                  fromType(Integer.class));
@@ -244,6 +247,7 @@ public class HeisenbergSource extends Source<String, Object> {
     if (executor != null) {
       scheduledFuture.cancel(true);
       executor.stop();
+      executor.isShutdown();
     }
 
     if (connection != null) {
